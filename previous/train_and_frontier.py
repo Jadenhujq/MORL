@@ -3,8 +3,8 @@ import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from data_generation import generate_synthetic_market
-from esg_env import ESGPortfolioEnv
+from previous.data_generation import generate_synthetic_market
+from previous.esg_env import ESGPortfolioEnv
 
 
 def pareto_filter(points):
