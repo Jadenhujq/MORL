@@ -1,38 +1,68 @@
 import os
 import numpy as np
+import gymnasium as gym
 from stable_baselines3 import PPO
-from env import PortfolioEnv
-from wrapper import ScalarizationWrapper
 
-# ========= 可调参数 =========
-WEIGHTS_LIST = [
-    [0.7, 0.2, 0.1],
-    [0.5, 0.3, 0.2],
-    [0.3, 0.4, 0.3],
-    [0.2, 0.3, 0.5],
-    [0.8, 0.1, 0.1],
-]
+from portfolio_env import DynamicPortfolioEnv
+from generate_weight import generate_weight_grid
 
-TIMESTEPS = 300_000
-SAVE_DIR = "models"
 
-os.makedirs(SAVE_DIR, exist_ok=True)
-
-# ========= 读取数据 =========
+# ===== 1. 加载数据 =====
 returns = np.load("data/returns.npy")
-esg = np.load("data/esg.npy")
+esg_scores = np.load("data/esg.npy")
+cov_matrices = np.load("data/cov.npy")
+features = np.load("data/features.npy")
 
-# ========= 训练循环 =========
-for i, weights in enumerate(WEIGHTS_LIST):
-    print(f"\n===== Training model {i} with weights {weights} =====")
 
-    env = PortfolioEnv(returns, esg)
-    env = ScalarizationWrapper(env, weights)
+# ===== 2. 生成 weights（核心）=====
+weights_list = generate_weight_grid(n_points=3)
 
-    model = PPO("MlpPolicy", env, verbose=1)
-    model.learn(total_timesteps=TIMESTEPS)
 
-    model_path = f"{SAVE_DIR}/ppo_w{i}"
+# ===== 3. 创建模型保存目录 =====
+os.makedirs("models", exist_ok=True)
+
+
+# ===== 4. 训练循环 =====
+for i, (rho, zeta, phi) in enumerate(weights_list):
+
+    print("\n" + "="*50)
+    print(f"Training Model {i}")
+    print(f"Weights: rho={rho:.2f}, zeta={zeta:.2f}, phi={phi:.2f}")
+    print("="*50)
+
+    # ===== 创建环境 =====
+    env = DynamicPortfolioEnv(
+        returns=returns,
+        esg_scores=esg_scores,
+        cov_matrices=cov_matrices,
+        features=features,
+        rho=rho,
+        zeta=zeta,
+        phi=phi
+    )
+
+    # ===== 创建 PPO =====
+    model = PPO(
+        "MlpPolicy",
+        env,
+        verbose=1,
+        tensorboard_log="./logs/",
+        learning_rate=3e-4,
+        n_steps=2048,
+        batch_size=64,
+        gamma=0.99,
+        gae_lambda=0.95,
+        clip_range=0.2,
+    )
+
+    # ===== 训练 =====
+    model.learn(total_timesteps=20000)
+
+    # ===== 保存模型 =====
+    model_path = f"models/ppo_{i}"
     model.save(model_path)
 
     print(f"Saved to {model_path}")
+
+
+print("\nAll models trained successfully.\n")

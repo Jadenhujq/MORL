@@ -1,6 +1,6 @@
 import numpy as np
 from stable_baselines3 import PPO
-from env import PortfolioEnv
+from portfolio_env import PortfolioEnv
 from wrapper import ScalarizationWrapper
 
 WEIGHTS_LIST = [
